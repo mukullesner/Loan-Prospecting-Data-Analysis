@@ -4,3 +4,4 @@
 -	After analysis found out that people with lower prosper rating cannot take loans above $30000 dollars and has to pay high rates, also correlation of 0.29 between credit score and monthly income.
 -	After examining the dataset came to know that employment status plays a vital role in determining the loan amount and borrow rate decreases for people with high loan amount and good credit score.
 
+![images](https://drive.google.com/file/d/1llloRzm0MdKdAj5Uea_8BygIgr7wxWS9/view?usp=sharing)
