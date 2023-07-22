@@ -1,0 +1,757 @@
+Prospect Loan Analysis by MUKUL KOMMABATHULA
+
+---
+title: "Loan Data from Prosper"
+subtitle: "Exploratory Data Analysis"
+author: "Mukul Kommabathula"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    # theme of html document
+    # theme of code highlight                                 
+    # table of contents
+    theme       : journal            # "default", "cerulean", "journal",
+                                    # "flatly", "readable", "spacelab",
+                                    # "united", "cosmo", "lumen", "paper", 
+                                    # "sandstone", "simplex", "yeti"
+    highlight   : tango          # "default", "tango", "pygments",
+                                    # "kate",  "monochrome", "espresso",
+                                    # "zenburn", "haddock", "textmate"
+    toc         : true              # get table of content
+    toc_depth   : 3
+    toc_float   : true
+    df_print    : paged
+
+---
+========================================================
+
+Prosper Marketplace is America's first peer-to-peer lending marketplace, with
+over \$7 billion in funded loans. Borrowers request personal loans on Prosper
+and investors (individual or institutional) can fund anywhere from \$2,000 to 
+\$35,000 per loan request. Investors can consider borrowers' credit scores, 
+ratings, and histories and the category of the loan. Prosper handles the 
+servicing of the loan and collects and distributes borrower payments and 
+interest back to the loan investors.
+
+Prosper verifies borrowers' identities and select personal data before 
+funding loans and manages all stages of loan servicing. Prosper's unsecured
+personal loans are fully amortized over a period of three or five years, with
+no pre-payment penalties. Prosper generates revenue by collecting a one-time
+fee on funded loans from borrowers and assessing an annual loan servicing fee
+to investors.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+# Load all of the packages that are needed to run this analysis.
+
+library(GGally)
+library(ggplot2)
+library(gridExtra)
+library(plyr)
+library(dplyr)
+library(plyr)
+library(reshape2)
+
+```
+
+```{r echo=FALSE, Load_the_Data}
+# Load the Data
+Loan_data <- read.csv("prosperLoanData.csv")
+ # explore the dataset
+str(Loan_data)
+```
+
+- This data set contains 113,937 loans with 81 variables on each loan, including loan amount, borrower rate 
+(or interest rate), current loan status, borrower income, borrower employment status, borrower credit history, 
+and the latest payment information.
+
+# Univariate Plots Section
+
+## Plotting Loan Term
+
+```{r echo=FALSE, fig.height=3, fig.width=3, Univariate_Plots}
+
+ggplot(aes(x = Term), data = Loan_data) +
+  geom_histogram(binwidth = 12, fill = I('springgreen3')) +
+  scale_x_continuous(breaks = c(12,36,60))
+
+```
+- 36 seems to be the Term with the highest month that borrower chooses
+
+
+- Explore the Loan originating quarter
+
+
+```{r echo=FALSE, fig.height=3, fig.width=10}
+Loan_data$LoanOriginationQuarter <- factor(Loan_data$LoanOriginationQuarter, 
+                                           levels = unique(Loan_data$LoanOriginationQuarter),
+                                           ordered = TRUE)
+
+ggplot(data = Loan_data, aes(x = LoanOriginationQuarter)) +
+  geom_bar(fill='#369b80') +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.1))
+
+```
+
+- Let's take a closer look on the yearly basis data
+
+
+
+```{r echo=FALSE, fig.height=3, fig.width=5}
+
+Loan_data$Year <- as.integer(substring(Loan_data$LoanOriginationQuarter,4))
+  
+
+# Plot the yearly data
+
+ggplot(data = Loan_data, aes(x =Year)) +
+  geom_bar(fill='#369b80') +
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 10)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.1))
+
+```
+
+- For the graph we have seen that there has been a dip in the year 2009
+
+```{r}
+
+# Looking into the percantage of the borrowers
+
+
+tblFun <- function(x){
+    tbl <- table(Loan_data$LoanOriginationYear)
+    res <- cbind(tbl,round(prop.table(tbl)*100,2))
+    colnames(res) <- c('Number Of Borrowers','Percentage')
+    res
+}
+
+do.call(rbind,lapply(tips[0:1],tblFun))
+
+```
+
+
+- Next we will see what interest rate does the prosper loan offers
+
+```{r}
+
+summary(Loan_data$BorrowerRate)
+
+```
+
+# plotting BorrowerRate 
+```{r echo=FALSE, fig.height=3 ,fig.width=5}
+ggplot(aes(x=BorrowerRate), data=Loan_data) +
+  geom_histogram(fill='#369b80', color='#0542c4')
+```
+
+- It seems that that the borrower interest rate is around 0.0 to 0.5. For most of the borrower the interst is less than 0.25
+
+- Let's check the borrower who has the interest rate of zero
+
+```{r}
+
+sum(Loan_data$BorrowerRate==0)
+
+```
+
+- There are 8 people with the interest rate of zero percent. Maybe the loan was given before 2009
+
+- Now we will explore what level of prosper reting is available
+
+```{r}
+
+Loan_data$ProsperRating..Alpha. <- ordered(Loan_data$ProsperRating..Alpha., 
+                                levels = c("AA","A","B","C","D","E","HR",""))
+levels(Loan_data$ProsperRating..Alpha.)
+table(Loan_data$ProsperRating..Alpha.)
+
+```
+
+# Plotting prosper rating for borrower
+```{r}
+
+ggplot(aes(x = ProsperRating..Alpha.), data = Loan_data) +
+  geom_bar(fill = '#369b80',color = '#0542c4')
+
+```
+
+- The shape of distipution seems like a bell shaped curve and the most common prosper ratings are A,B,C, and D.
+
+- Let’s check What purpose borrowers are taking loans for?!
+
+```{r}
+# Create a new variable to display the full name Instead of a number for listing category
+
+Loan_data$ListingCategory..string <- mapvalues(Loan_data$ListingCategory..numeric.,
+                           from = c(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,
+                                    16,17,18,19,20),
+                           to = c("Not Available", "Debt Consolidation", 
+                                  "Home Improvements", "Business", 
+                                  "Personal Loan","Student Use","Auto",
+                                  "Other","Baby&Adoption","Boat",
+                                  "Cosmetic Procedure","Engagement Ring",
+                                  "Green Loans","Household Expenses",
+                                  "Large Purchases","Medical/Dental",
+                                  "MotorCycle","RV","Taxes","Vacation",
+                                  "Wedding Loans"))
+
+# Create a table to explore the number of borrowers in each category 
+table(Loan_data$ListingCategory..string)
+
+```
+
+# Plotting Listing Category
+```{r echo=FALSE, fig.height=4 ,fig.width=7}
+
+ggplot(aes(x=ListingCategory..string), data=Loan_data) +
+  geom_bar(fill='#369b80', color='#0542c4') +
+  coord_flip()
+
+```
+
+- We can see that most of the loan borrower are taking loan to clear their debt consolidation
+- Next to thedebt consolodation most people take loan Business and Home improvement
+
+- Lets Explore the geographical distribution for borrowers.    
+
+# Plotting BorrowerState
+```{r echo=FALSE, fig.height=4 ,fig.width=7}
+ggplot(aes(x=BorrowerState), data=Loan_data) +
+  geom_bar(fill='#369b80', color='#0542c4')+
+   theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))
+
+```
+
+- Prosper is a California based company. That might be the reason that there are more loans originated in this state. 
+- Next mostly used states are FL, GA, IL, NY, and TX. 
+
+- Exploring the range of loan amounts borrowers are requesting.  
+```{r}
+
+summary(Loan_data$LoanOriginalAmount)
+
+```
+
+```{r echo=FALSE, fig.height=4 ,fig.width=7, message=FALSE, warning=FALSE}
+# Plotting LoanOriginalAmount
+ggplot(aes(x=LoanOriginalAmount), data=Loan_data) +
+  geom_histogram(fill='#369b80', color='#0542c4')
+```
+- The shape of distribution is positively skewed. Minimum loan amount is 1000 and maximum is 35000. Third quartile is 12000. There is a big difference between Q3 and the max amount. 
+
+- Let's check how the graph will change when x limits are from 0 to 95%!
+
+```{r echo=FALSE, fig.height=4 ,fig.width=7, message=FALSE, warning=FALSE}
+
+ggplot(aes(x=LoanOriginalAmount), data=Loan_data) +
+  geom_histogram(fill='#369b80', color='#0542c4')+
+  scale_x_continuous(lim=c(0,quantile(Loan_data$LoanOriginalAmount,0.95)))
+
+```
+
+- We can see that the majority of loans are below 10000
+
+- Now we will check borrowers monthly income
+
+```{r}
+summary(Loan_data$StatedMonthlyIncome)
+
+```
+
+```{r echo=FALSE, fig.height=4 ,fig.width=7, message=FALSE, warning=FALSE}
+# plotting StatedMonthlyIncome 
+ggplot(aes(x=StatedMonthlyIncome), data=Loan_data) +
+  geom_histogram(fill='#369b80', color='#0542c4')
+```
+
+. There seems to be an Outlier. 
+
+. I will change the x limits to see the graph closely.
+
+```{r echo=FALSE, fig.height=4 ,fig.width=7, message=FALSE, warning=FALSE}
+# Limit x axis for the StatedMonthlyIncome to upto 95%
+ggplot(aes(x=StatedMonthlyIncome), data=Loan_data) +
+  geom_histogram(fill='#369b80', color='#0542c4')+
+  scale_x_continuous(lim=c(0,quantile(Loan_data$StatedMonthlyIncome,0.95)))
+```
+
+- People who have less monthly income are more likely to take loans. 
+It is also interesting to see that there are people with zero monthly income. 
+Even though, they managed to get the loan. 
+
+- Let's check the number of people who got loans with zero income.
+
+```{r}
+# Lets check the number of borrowers with zero income
+sum(Loan_data$StatedMonthlyIncome == 0)
+
+```
+
+. Total of 1394 people got loans with zero income. This group holds people with listing creation date after and before 2009. 
+So there is no chance to think that thay are of some interest to lenders. It is interesting to see that all these people come under zero income or not employed. May be they have shown some property to get the loan or they are doing some other kind of job that doesn't come in the category of monthly income. 
+
+- Next looking into the income range graph
+
+```{r}
+
+table(Loan_data$IncomeRange)
+```
+
+# Plotting Income range
+```{r}
+ggplot(aes(x=IncomeRange), data=Loan_data) +
+  geom_bar(fill='#369b80') +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5,hjust = 1))
+
+```
+
+. Most people with the income range from 25,000-74,999 took loans. 
+
+. Let's look into the debt to income ratio graph.
+
+```{r}
+
+summary(Loan_data$DebtToIncomeRatio)
+```
+
+
+```{r echo=FALSE, fig.height=4 ,fig.width=7, message=FALSE, warning=FALSE}
+# Plot a histogram for DebtToIncomeRatio
+ggplot(aes(x=DebtToIncomeRatio), data=Loan_data) +
+  geom_histogram(fill='#369b80', color='#0542c4')
+
+```
+
+. To get a clear graph we will take the 99 percentile.
+
+```{r}
+# Create a new variable for the 0.50, 0.90, 0.99 percentage to debt to ratio
+debt_income_ratio <- subset(Loan_data, !is.na(DebtToIncomeRatio))
+quantile(debt_income_ratio$DebtToIncomeRatio, c(0.5, 0.9, 0.99))
+
+
+```
+
+```{r echo=FALSE, fig.height=4 ,fig.width=7, message=FALSE, warning=FALSE}
+
+# Plot the 0.99 percentile for DebtToIncomeRatio 
+ggplot(aes(x=DebtToIncomeRatio), data=debt_income_ratio) +
+  geom_histogram(binwidth=0.01, fill='#369b80', color='#0542c4')+
+  scale_x_continuous(lim=c(0,quantile(debt_income_ratio$DebtToIncomeRatio,0.99)))
+```
+
+. Now the graph seems to be much better. Almost 99% of the Debt to income ratio is less than 0.86. This is a good number because people cannot pay all of their income for their loan payments.
+
+.  Let's investigate the number of people which thier debt to income ratio is greater than 1!
+
+```{r}
+# Check number of borrowers with DebtToIncomeRatio > 1
+table(Loan_data$DebtToIncomeRatio > 1)
+```
+
+. Let's look into their loans' status. 
+
+# Univariate Analysis
+
+> **Tip**: Now that you've completed your univariate explorations, it's time to
+reflect on and summarize what you've found. Use the questions below to help you
+gather your observations and add your own if you have other thoughts!
+
+### What is the structure of your dataset?
+
+### What is/are the main feature(s) of interest in your dataset?
+
+### What other features in the dataset do you think will help support your \
+investigation into your feature(s) of interest?
+
+### Did you create any new variables from existing variables in the dataset?
+
+### Of the features you investigated, were there any unusual distributions? \
+Did you perform any operations on the data to tidy, adjust, or change the form \
+of the data? If so, why did you do this?
+
+
+# Bivariate Plots Section
+
+Here, I setup a dataframe that contains variables that are of interest to further analyze. 
+
+```{r}
+# Subset a dataframe to Explore some variables
+selected_df <- subset(Loan_data, select = c(BorrowerAPR,BorrowerRate, LenderYield,
+ProsperRating..numeric.,CreditScoreRangeLower,CreditScoreRangeUpper,
+CurrentCreditLines,OpenCreditLines,TotalCreditLinespast7years,
+OpenRevolvingAccounts,TotalInquiries,AmountDelinquent,RevolvingCreditBalance,
+BankcardUtilization,AvailableBankcardCredit,DebtToIncomeRatio,
+LoanMonthsSinceOrigination,LoanOriginalAmount, MonthlyLoanPayment,Investors))
+
+ggcorr(selected_df, hjust=0.95, size = 2.7, label = TRUE, label_size = 3, layout.exp = 3.5, color = 'black')
+```
+
+```{r echo=FALSE, Bivariate_Plots}
+
+Loan_data$ProsperRating..Alpha. <- ordered(Loan_data$ProsperRating..Alpha., levels = c("AA","A","B","C","D","E","HR"))
+
+ggplot(aes(x = ProsperRating..Alpha., y = BorrowerRate), data = Loan_data) +
+  geom_boxplot(aes(fill = Loan_data$ProsperRating..Alpha.))
+
+```
+
+. As we can see that the borrower rate keeps on increasing as the ProsperRating keeps on decreasing.
+
+. Now We will analyze on what basis prosper rating is given! 
+
+```{r}
+
+Loan_data$EmploymentStatus <- ordered(Loan_data$EmploymentStatus, levels = c("Not employed",
+                                      "Other","Self-employed", "Employed",
+                                      "Part-time","Retired","Full-time"))
+
+ggplot(aes(x = EmploymentStatus), data = subset(Loan_data, !is.na(Loan_data$ProsperRating..numeric.))) +
+  geom_bar(aes(fill = ProsperRating..Alpha.), position = 'fill')
+
+```
+
+. It seems that employment status plays a role in determining prosper rating. Employed borrowers must have a better proper rating than not employed.
+
+. We will see how income range influence prosper rating.
+
+```{r echo=FALSE, fig.height=4 ,fig.width=7, message=FALSE, warning=FALSE}
+# Convert IncomeRange to ordered factor with 6 levels
+Loan_data$IncomeRange <- ordered(Loan_data$IncomeRange, levels = c("$0",
+                  "$1-24,999","$25,000-49,999","$50,000-74,999",
+                  "$75,000-99,999","$100,000+"))
+
+#plotting IncomeRange by ProsperRating
+ggplot(aes(x=IncomeRange),
+       data=subset(Loan_data, !is.na(Loan_data$ProsperRating..numeric.)))+
+  geom_bar(aes(fill=ProsperRating..Alpha.), position = "fill")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+. It is clear that as income range is more prosper rating is better. That's because they are comfortable to pay their debts on time. 
+
+. We will see how credit score influence prosper rating.
+
+```{r echo=FALSE, fig.height=4 ,fig.width=7, message=FALSE, warning=FALSE}
+# plotting CreditScoreRangeLower by ProsperRating
+ggplot(aes(x=CreditScoreRangeLower),
+       data=subset(Loan_data, !is.na(Loan_data$ProsperRating..numeric.)))+
+  geom_bar(aes(fill=ProsperRating..Alpha.),position="fill")
+```
+
+. As the credit score increases the prosper rating also increases
+
+. Now we will see what factors influence credit score.
+
+```{r}
+
+ggplot(aes(x = factor(CreditScoreRangeLower), y = CurrentCreditLines), data = subset(Loan_data, CreditScoreRangeLower>500)) +
+  geom_boxplot()
+
+```
+
+```{r}
+
+# Check the correlation between CreditScoreRangeLower and CurrentCreditLines
+with(Loan_data, cor.test(CreditScoreRangeLower,CurrentCreditLines, method = "pearson"))
+```
+
+. It show us that the more the credit line the better is the credit score
+
+```{r}
+#Let's look at corr bween CreditScoreRangeLower and TotalInquiries
+with(Loan_data, cor.test(CreditScoreRangeLower, TotalInquiries))
+
+```
+
+. The lesser the enquiries the better the score
+
+```{r echo=FALSE, fig.height=3 ,fig.width=8, message=FALSE, warning=FALSE}
+# plotting CreditScoreRangeLower by BorrowerRate
+ggplot(aes(x=factor(CreditScoreRangeLower),y=BorrowerRate),data=Loan_data)+
+  geom_boxplot( )
+```
+
+```{r}
+
+# Check the correlation between BorrowerRate and CreditScoreRangeLower
+with(Loan_data, cor.test(BorrowerRate,CreditScoreRangeLower, method = "pearson"))
+```
+
+. Good interest rates for higher credit score. 
+
+. Now we will see how monthly income, term and loan original amount are influenced by different factors!
+
+```{r}
+# Plotting StatedMonthlyIncome by MonthlyLoanPayment
+ggplot(aes(x = StatedMonthlyIncome, y = MonthlyLoanPayment), data = Loan_data) +
+  geom_point(alpha = 1/10, fill=I("#ea56b1"),color=I("black"),shape=21)+
+  geom_smooth(method = "lm", color = 'red') +
+  scale_x_continuous(limits = c(0, quantile(Loan_data$StatedMonthlyIncome, 0.95)))
+
+```
+
+```{r}
+# Check the correlation between StatedMonthlyIncome and MonthlyLoanPayment
+with(Loan_data, cor.test(StatedMonthlyIncome,MonthlyLoanPayment, method = "pearson"))
+```
+
+. People who have more income are taking higher loans.
+
+```{r echo=FALSE, fig.height=3 ,fig.width=6, message=FALSE, warning=FALSE}
+
+# plotting the 0.95 percentile of StatedMonthlyIncome by LoanOriginalAmount
+ggplot(aes(x=StatedMonthlyIncome,y=LoanOriginalAmount),data=Loan_data)+
+  geom_point(alpha=1/10,fill=I("#ea56b1"),color=I("black"),shape=21)+
+  geom_smooth(method = "lm", color = "red")+
+  scale_x_continuous(lim=c(0,quantile(Loan_data$StatedMonthlyIncome,0.95)))
+```
+
+```{r}
+# Check the correlation between StatedMonthlyIncome and LoanOriginalAmount
+with(Loan_data, cor.test(StatedMonthlyIncome,LoanOriginalAmount, method = "pearson"))
+```
+
+. The higher the income, the higher the loan amount taken.
+
+```{r}
+# display borrowers' income range
+table(Loan_data$IncomeRange)
+```
+
+. But as the income increases, number of people taking loan is decreasing. Is seems right because people with higher income will be self-sufficient and they may be do not need personal loans.  
+
+```{r echo=FALSE, fig.height=5 ,fig.width=8, message=FALSE, warning=FALSE}
+# Plotting ListingCategory by LoanOriginalAmount
+ggplot(aes(x = ListingCategory..string, y = LoanOriginalAmount), data = Loan_data) +
+  geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+
+```
+
+. People are taking higher loan amounts for debt consolidation and baby&adoption. 
+
+
+```{r echo=FALSE,fig.height=5,fig.width=10,message=FALSE,warning=FALSE}
+
+# Plotting ListingCategory by LoanOriginationYear
+ggplot(aes(x=Term,y=LoanOriginalAmount),data=Loan_data)+
+  geom_boxplot(aes(fill=Term))+
+  facet_grid(~Term, scales = )
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))
+```
+
+```{r echo=FALSE, fig.height=3 ,fig.width=6, message=FALSE, warning=FALSE}
+
+# Plotting Term by BorrowerRate
+ggplot(aes(x=Term,y=BorrowerRate),data=Loan_data)+
+  geom_boxplot(aes(fill=Term))+
+   theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))
+```
+
+. Term has influence over borrower rate.
+
+```{r echo=FALSE, fig.height=3 ,fig.width=6, message=FALSE, warning=FALSE}
+# Plotting LoanOriginalAmount by BorrowerRate
+ggplot(aes(x=LoanOriginalAmount, y=BorrowerRate), 
+           data = Loan_data)+ 
+  geom_point(alpha=1/10,fill=I("#ea56b1"),color=I("black"),shape=21)+
+  geom_smooth(method = "lm", color = "red")
+```
+
+
+```{r}
+# Check the correlation between LoanOriginalAmount and BorrowerRate
+with(Loan_data, cor.test(LoanOriginalAmount,BorrowerRate, method = "pearson"))
+```
+
+. As loan amount increases, interest rates seem to be reasonable.
+  
+# Bivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the \
+investigation. How did the feature(s) of interest vary with other features in \
+the dataset?
+
+Borrower rate is determined by prosper rating, credit score, loan original amount, and term. And there is a strong relationship between Borrower rate and credit score with R^2 -0.46. In turn, credit score is influenced by total inquiries, credit lines and monthly loan payments. And Loan original amount is influenced by term, employment status and listing category.      
+
+### Did you observe any interesting relationships between the other features \
+(not the main feature(s) of interest)?
+
+1) Larger loan payment, lesser inquiries, and more credit lines results in better credit score.
+2) People who earn more are likely to take more loan amount. But as the income increases, number of people taking loans is decreasing.
+3) Employment status has influence upon loan amount. Employed seems to have opportunity to apply for higher loan amounts.
+4) Borrowers can get higher loans when they choose to payoff in more years.
+5) Interest rates are reasonable for higher loan amount. 
+6) People are taking higher loan amounts for debt consolidation and baby&adoption.
+
+
+# Multivariate Plots Section
+
+. In this section, we will see how main factors are inter related.
+
+```{r echo=FALSE, fig.height=3 ,fig.width=6, message=FALSE, warning=FALSE, Multivariate_Plots}
+# plot for ProsperRating by LoanOriginalAmount
+p1<-ggplot(aes(x=ProsperRating..numeric., y=LoanOriginalAmount), data = Loan_data)+
+  geom_line(aes(color=Term), stat = "summary", 
+            fun.y = mean)
+
+# plot for CreditScoreRangeLower by LoanOriginalAmount
+p2<-ggplot(aes(x=CreditScoreRangeLower, y=LoanOriginalAmount), 
+           data = subset(Loan_data, CreditScoreRangeLower>500))+
+  geom_line(aes(color=Term), stat = "summary", 
+            fun.y = mean)
+
+# displaying the two plots on one grid 
+grid.arrange(p1,p2,ncol=1)
+```
+
+. At the same level of prosper rating and credit score, higher the term implies borrowers have chance to apply for higher loan amount. 
+
+. We will see whether income influence loan amount. In bivariate analysis, we have seen that loan original amount and stated monthly income are related by R^2 of 0.2. 
+
+. Now we will see how they behave when term comes into the picture.
+
+```{r echo=FALSE, fig.height=5 ,fig.width=8, message=FALSE, warning=FALSE}
+
+# Plotting LoanOriginalAmount by BorrowerRate and ProsperRating
+
+ggplot(aes(x=LoanOriginalAmount,y=BorrowerRate),data=Loan_data)+
+  geom_point(aes(color=ProsperRating..Alpha.), 
+             alpha=0.5, size=0.75, position = "jitter") +
+  geom_smooth(method = "lm", color = "red") +
+  scale_color_brewer(palette = "RdYlBu", name="Prosper\nRating",
+                     direction=-1)+
+  guides(color=guide_legend(override.aes = list(alpha = 1, size = 3)))
+```
+
+. Borrowers who have good prosper rating have an opportunity to avail lower borrower rates and at the same time, they can take higher loans.
+
+```{r echo=FALSE, fig.height=3 ,fig.width=6, message=FALSE, warning=FALSE}
+
+by_term_ProsperRating <- group_by(Loan_data,Term,ProsperRating..numeric.)
+Loan_data.by_term_ProsperRating <- summarise(by_term_ProsperRating,
+                    mean_StatedMonthlyIncome = mean(StatedMonthlyIncome),
+                    median_StatedMonthlyIncome = median(StatedMonthlyIncome),
+                    mean_LoanOriginalAmount = mean(LoanOriginalAmount),
+                    median_LoanOriginalAmount = median(LoanOriginalAmount),
+                    mean_BorroweRate = mean(BorrowerRate), n=n())
+ggplot(aes(x=mean_StatedMonthlyIncome, y=mean_LoanOriginalAmount), 
+       data = Loan_data.by_term_ProsperRating)+
+  geom_line(aes(color=Term))
+```
+
+. Even if income earning are low, people have opportunity to take higher loan amounts when they choose to pay off in 5years. It seems reasonable because borrowers will have affordable monthly loan payments and their debt to income ration will be much more less than 1.  
+
+```{r echo=FALSE, fig.height=4 ,fig.width=10, message=FALSE, warning=FALSE }
+
+# Boxplotting EmploymentStatus by LoanOriginalAmount and Term
+ggplot(aes(x=EmploymentStatus,y=LoanOriginalAmount, 
+           fill = Term),data=Loan_data)+
+  geom_boxplot()+
+  scale_fill_brewer(type='seq',
+                   guide=guide_legend(title='Term'))
+```
+
+. Overall, all kinds of employment statuses can get higher loans but they have to choose higher term.  But in the graph, we can definitely see that those who are employed are borrowing much more loan amount than others in each term group. 
+
+. We will see graph for loan original amount Vs income range.
+
+```{r echo=FALSE,fig.height=6,fig.width=10,message=FALSE,warning=FALSE}
+
+# Boxplotting IncomeRange by LoanOriginalAmount and Term
+ggplot(aes(x=IncomeRange,y=LoanOriginalAmount, 
+           fill = Term),data=Loan_data)+
+  geom_boxplot()+
+  scale_fill_brewer(type='seq',
+                   guide=guide_legend(title='Term'))
+```
+
+. In this case also, borrowers can take higher loans when they are willing to pay in more number of terms and they are earning more.
+
+```{r echo=FALSE, fig.height=3 ,fig.width=6, message=FALSE, warning=FALSE}
+
+# Boxplotting mean_LoanOriginalAmount by mean_BorroweRate and Term
+ggplot(aes(x=mean_LoanOriginalAmount, y=mean_BorroweRate), 
+           data = Loan_data.by_term_ProsperRating) +
+  geom_line(aes(color=Term))
+```
+
+. In bivariate analysis, we have seen that higher loan original amount have better interest rates and they are related by R^2 of -0.33. 
+But when term comes into picture, interest rates are a little higher.
+
+# Multivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the \
+
+In spite of the different levels of credit score, proper rating, employment status, and monthly income borrowers have opportunity to take higher levels of loan amounts. But they have to choose to payoff in more number of terms.  
+
+### Were there any interesting or surprising interactions between features?
+
+People who have more income are likely to take higher loan amount. When I further analyzed loan original amount with respect to borrower rate. People can borrower more money but when term comes into picture, interest rates are little higher.
+ 
+
+------
+
+# Final Plots and Summary
+
+### Plot One
+```{r echo=FALSE,fig.height=4,fig.width=8,message=FALSE,warning=FALSE,Plot_One}
+
+# Plotting LoanOriginalAmount by BorrowerRate and ProsperRating
+ggplot(aes(x=LoanOriginalAmount,y=BorrowerRate),data=Loan_data)+
+  geom_point(aes(color=ProsperRating..Alpha.), 
+             alpha=0.5, size=0.75, position = "jitter") +
+  geom_smooth(method = "lm", color = "red") +
+  scale_color_brewer(palette = "RdYlBu", name="Prosper\nRating",
+                     direction=-1) +
+  guides(color=guide_legend(override.aes = list(alpha = 1, size = 3)))+
+  labs(title = "Loan Amount by Prosper Rating and Interest Rate", 
+    y = "Borrower Rate", x = "Loan Original Amount($)", color = "Prosper Rating")+
+  geom_smooth(method = "lm", color = "red")
+
+```
+
+### Description One
+
+Borrowers who have good prosper rating have an opportunity to avail lower borrower rates and at the same time, they can take higher loans. People who have lower proper rating cannot take higher loans like $30,000 and they have to pay higher borrower rates even for less loan amounts. This trend seems quite normal because lenders are taking risk of giving loans to people who have bad prosper rating. So, lenders should get some benefit of higher interest rates. It seems similar to the stock market if one takes the risk they might get huge profit or loss. 
+
+### Plot Two
+```{r  echo=FALSE,fig.height=6,fig.width=10,message=FALSE,warning=FALSE,Plot_Two}
+
+# Plotting IncomeRange by LoanOriginalAmount and Term
+ggplot(aes(x=IncomeRange,y=LoanOriginalAmount, 
+           fill = Term),data=Loan_data)+
+  geom_boxplot()+
+  scale_fill_brewer(type='seq',
+                   guide=guide_legend(title='Term'))+
+  labs(title = "Loan Amount by Income Range and Term", 
+    y = "Loan Original Amount($)", x = "Income Range")
+
+```
+
+### Description Two
+
+From this Boxplot it is clear that borrowers can take higher loans when they are willing to pay in more number of terms and they are earning more. And prosper is also making sure that even for people who are taking higher loan amounts have debt to income ration less than 1. 
+
+
+------
+
+# Reflection
+
+. The data set had nearly 114,000 loans from Nov 2005 - March 2014. After 2009 number of loans drastically increased. Prosper also changed its business model from 2009 and this might have attracted many borrowers.
+
+. Before lenders used to determine borrower rate and now depending on credit risk prosper will fix interest rates. Many interesting insights can be drawn from this data. Initially, I was very confused by too many variables but as time progressed, I think I got some hang of these variables. It is also surprising to see that the purpose for which people are taking loans for has changed drastically over years. 
+
+. I think that a lot can be analyzed using this data like why some people are not able to pay loan on time, what is determining interest rates, what reasons are making people take loans and so on.         
+
+------
+
+# Reflection
+
+> **Tip**: Here's the final step! Reflect on the exploration you performed and
+the insights you found. What were some of the struggles that you went through?
+What went well? What was surprising? Make sure you include an insight into
+future work that could be done with the dataset.
+
+> **Tip**: Don't forget to remove this, and the other **Tip** sections before
+saving your final work and knitting the final report!
