@@ -1,4 +1,4 @@
-# <p align = 'center' Loan-Prospecting-Data-Analysis</p>
+# Loan-Prospecting-Data-Analysis
 -	Evaluated loan dataset containing 114,000 loans with 81 variables.
 -	Performed EDA using R and extracted variables to analyze univariate, bivariate and multivariate plots.
 -	After analysis found out that people with lower prosper rating cannot take loans above $30000 dollars and has to pay high rates, also correlation of 0.29 between credit score and monthly income.
